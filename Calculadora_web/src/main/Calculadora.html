@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Calculadora Web</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .calculadora { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .botoes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        button { padding: 10px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .btn-danger { background: #dc3545; width: 100%; margin-top: 15px;}
+        .btn-danger:hover { background: #a71d2a; }
+        .resultado-box { margin-top: 15px; font-weight: bold; font-size: 1.2em; color: #333; }
+        .erro { color: red; font-size: 0.9em; margin-top: 10px; }
+        #historico { margin-top: 20px; width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        ul { list-style-type: none; padding: 0; }
+        li { border-bottom: 1px solid #eee; padding: 5px 0; }
+    </style>
+</head>
+<body>
+
+<div class="calculadora">
+    <h2>Calculadora</h2>
+    <input type="number" id="num1" placeholder="Primeiro Número" step="any">
+    <input type="number" id="num2" placeholder="Segundo Número (opcional p/ raiz)" step="any">
+
+    <div class="botoes">
+        <button onclick="calcular('+')">Soma (+)</button>
+        <button onclick="calcular('-')">Subtração (-)</button>
+        <button onclick="calcular('*')">Multiplicação (*)</button>
+        <button onclick="calcular('/')">Divisão (/)</button>
+        <button onclick="calcular('%')">Porcentagem (%)</button>
+        <button onclick="calcular('^')">Potência (^)</button>
+        <button onclick="calcular('sqrt')" style="grid-column: span 2;">Raiz Quadrada (√x)</button>
+    </div>
+
+    <div class="resultado-box">Resultado: <span id="resultado">-</span></div>
+    <div class="erro" id="mensagemErro"></div>
+</div>
+
+<div id="historico">
+    <h3>Histórico</h3>
+    <button class="btn-danger" onclick="limparHistorico()">Excluir Histórico</button>
+    <ul id="listaHistorico"></ul>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080/api/calculadora';
+
+    async function calcular(operador) {
+        const num1 = document.getElementById('num1').value;
+        const num2 = document.getElementById('num2').value;
+        const erroEl = document.getElementById('mensagemErro');
+        const resEl = document.getElementById('resultado');
+
+        erroEl.innerText = '';
+        resEl.innerText = '-';
+
+        if (!num1) {
+            erroEl.innerText = 'Preencha ao menos o primeiro número.';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/calcular`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numero1: parseFloat(num1),
+                    numero2: num2 ? parseFloat(num2) : null,
+                    operador: operador
+                })
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text);
+            }
+
+            const data = await response.json();
+            resEl.innerText = data.resultado;
+            carregarHistorico();
+
+        } catch (error) {
+            erroEl.innerText = error.message;
+        }
+    }
+
+    async function carregarHistorico() {
+        const response = await fetch(`${API_URL}/historico`);
+        const historico = await response.json();
+        const lista = document.getElementById('listaHistorico');
+        lista.innerHTML = '';
+
+        historico.forEach(op => {
+            const li = document.createElement('li');
+            let texto = op.operador === 'sqrt'
+                ? `√${op.numero1} = ${op.resultado}`
+                : `${op.numero1} ${op.operador} ${op.numero2} = ${op.resultado}`;
+            li.innerText = texto;
+            lista.appendChild(li);
+        });
+    }
+
+    async function limparHistorico() {
+        await fetch(`${API_URL}/historico`, { method: 'DELETE' });
+        carregarHistorico();
+    }
+
+    // Carrega o histórico ao iniciar
+    carregarHistorico();
+</script>
+</body>
+</html>
